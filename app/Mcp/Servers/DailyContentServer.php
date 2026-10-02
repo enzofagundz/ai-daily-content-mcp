@@ -7,6 +7,7 @@ use App\Mcp\Tools\ClassifyPendingPosts;
 use App\Mcp\Tools\ClassifyPost;
 use App\Mcp\Tools\FetchRecentPosts;
 use App\Mcp\Tools\GetNewPosts;
+use App\Mcp\Tools\GetRelevantPosts;
 use App\Mcp\Tools\ListProfiles;
 use App\Mcp\Tools\RemoveProfile;
 use Laravel\Mcp\Server;
@@ -18,7 +19,7 @@ use Laravel\Mcp\Server\Tool;
 
 #[Name('Daily Content')]
 #[Version('0.1.0')]
-#[Instructions('Monitors X profiles, fetches and stores their recent posts, and classifies each post with Cloudflare Clef so the agent can review the ones worth adapting into LinkedIn content. The MCP only collects, classifies and serves posts; it never writes or publishes LinkedIn content.')]
+#[Instructions('Monitors X profiles and classifies their posts with Cloudflare Clef for LinkedIn content triage. Use get_new_posts to collect and classify new posts, get_relevant_posts to review the relevant candidates, and classify_pending_posts to catch up on posts collected before the classifier existed. The MCP only collects, classifies and serves posts; it never writes or publishes LinkedIn content.')]
 class DailyContentServer extends Server
 {
     /**
@@ -34,6 +35,7 @@ class DailyContentServer extends Server
         GetNewPosts::class,
         ClassifyPost::class,
         ClassifyPendingPosts::class,
+        GetRelevantPosts::class,
     ];
 
     /**
