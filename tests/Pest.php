@@ -72,9 +72,9 @@ function fakeSource(PostFetchResult $result): FakePostSource
 /**
  * Bind a fake content classifier in the container and return it for assertions.
  */
-function fakeClassifier(?ContentClassification $result = null, ?ClassificationException $exception = null): FakeContentClassifier
+function fakeClassifier(?ContentClassification $result = null, ?ClassificationException $exception = null, ?Closure $callback = null): FakeContentClassifier
 {
-    $fake = new FakeContentClassifier($result, $exception);
+    $fake = new FakeContentClassifier($result, $exception, $callback);
     app()->instance(ContentClassifier::class, $fake);
 
     return $fake;

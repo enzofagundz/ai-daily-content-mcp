@@ -3,6 +3,7 @@
 namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\AddProfile;
+use App\Mcp\Tools\ClassifyPendingPosts;
 use App\Mcp\Tools\ClassifyPost;
 use App\Mcp\Tools\FetchRecentPosts;
 use App\Mcp\Tools\GetNewPosts;
@@ -32,6 +33,7 @@ class DailyContentServer extends Server
         FetchRecentPosts::class,
         GetNewPosts::class,
         ClassifyPost::class,
+        ClassifyPendingPosts::class,
     ];
 
     /**

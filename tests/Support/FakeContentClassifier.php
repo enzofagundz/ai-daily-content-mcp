@@ -6,6 +6,7 @@ use App\Services\Classification\ClassificationException;
 use App\Services\Classification\ContentClassification;
 use App\Services\Classification\ContentClassifier;
 use App\Services\Classification\PostClassificationInput;
+use Closure;
 
 class FakeContentClassifier implements ContentClassifier
 {
@@ -14,14 +15,22 @@ class FakeContentClassifier implements ContentClassifier
      */
     public array $calls = [];
 
+    /**
+     * @param  (callable(PostClassificationInput): ContentClassification)|null  $callback
+     */
     public function __construct(
         private ?ContentClassification $result = null,
         private ?ClassificationException $exception = null,
+        private ?Closure $callback = null,
     ) {}
 
     public function classify(PostClassificationInput $post): ContentClassification
     {
         $this->calls[] = $post;
+
+        if ($this->callback !== null) {
+            return ($this->callback)($post);
+        }
 
         if ($this->exception !== null) {
             throw $this->exception;
