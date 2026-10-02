@@ -1,6 +1,11 @@
 <?php
 
+use App\Services\Twitter\FetchedPost;
+use App\Services\Twitter\PostFetchResult;
+use App\Services\Twitter\PostSource;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\FakePostSource;
 use Tests\TestCase;
 
 /*
@@ -47,4 +52,30 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Bind a fake post source in the container and return it for assertions.
+ */
+function fakeSource(PostFetchResult $result): FakePostSource
+{
+    $fake = new FakePostSource($result);
+    app()->instance(PostSource::class, $fake);
+
+    return $fake;
+}
+
+/**
+ * Build a fetched post with sensible defaults for tests.
+ */
+function fetchedPost(string $externalId, string $username, string $publishedAt, string $text = 'post text', ?string $author = null): FetchedPost
+{
+    return new FetchedPost(
+        externalId: $externalId,
+        username: $username,
+        author: $author ?? ucfirst($username),
+        text: $text,
+        url: "https://x.com/{$username}/status/{$externalId}",
+        publishedAt: CarbonImmutable::parse($publishedAt),
+    );
 }

@@ -5,18 +5,8 @@ use App\Mcp\Tools\FetchRecentPosts;
 use App\Models\Profile;
 use App\Services\Twitter\FetchedPost;
 use App\Services\Twitter\PostFetchResult;
-use App\Services\Twitter\PostSource;
 use Carbon\CarbonImmutable;
 use Illuminate\Testing\Fluent\AssertableJson;
-use Tests\Support\FakePostSource;
-
-function fakeSource(PostFetchResult $result): FakePostSource
-{
-    $fake = new FakePostSource($result);
-    app()->instance(PostSource::class, $fake);
-
-    return $fake;
-}
 
 test('fetch_recent_posts fetches every monitored profile by default', function () {
     Profile::factory()->create(['username' => 'theo']);
