@@ -1,1 +1,2 @@
 twscrape==0.20.1
+cryptography>=46

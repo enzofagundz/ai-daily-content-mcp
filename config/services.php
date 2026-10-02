@@ -38,10 +38,12 @@ return [
     'scraper' => [
         'python' => env('SCRAPER_PYTHON', base_path('scraper/.venv/bin/python')),
         'script' => env('SCRAPER_SCRIPT', base_path('scraper/x_posts.py')),
+        'read_browser_script' => env('SCRAPER_READ_BROWSER_SCRIPT', base_path('scraper/read_browser_cookies.py')),
         'accounts_db' => env('SCRAPER_ACCOUNTS_DB', storage_path('app/scraper/accounts.db')),
         'timeout' => env('SCRAPER_TIMEOUT', 300),
         'storage_state' => env('SCRAPER_STORAGE_STATE', '~/.twitter-mcp/storage_state.json'),
         'account_label' => env('SCRAPER_ACCOUNT_LABEL', 'default'),
+        'browser' => env('SCRAPER_BROWSER', 'brave'),
     ],
 
 ];
