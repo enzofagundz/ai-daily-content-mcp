@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Support\ClassifiedPostPayload;
 use App\Models\Post;
 use App\Services\Classification\ClassificationException;
 use App\Services\Classification\PostClassifier;
@@ -51,25 +52,7 @@ class ClassifyPost extends Tool
         $post->refresh()->loadMissing('profile');
 
         return Response::structured([
-            'post' => [
-                'id' => $post->id,
-                'author' => $post->author,
-                'username' => $post->profile->username,
-                'text' => $post->text,
-                'url' => $post->url,
-                'published_at' => $post->published_at->toIso8601String(),
-                'classification' => [
-                    'status' => $post->classification_status,
-                    'relevant' => $post->classification_relevant,
-                    'score' => $post->classification_score,
-                    'category' => $post->classification_category,
-                    'content_value_score' => $post->classification_content_value_score,
-                    'adaptability_score' => $post->classification_adaptability_score,
-                    'fits_profile' => $post->classification_profile_fit,
-                    'requires_missing_media' => $post->classification_requires_missing_media,
-                    'classified_at' => $post->classified_at?->toIso8601String(),
-                ],
-            ],
+            'post' => ClassifiedPostPayload::for($post),
         ]);
     }
 
