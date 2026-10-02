@@ -3,9 +3,9 @@
 namespace App\Mcp\Tools;
 
 use App\Models\Profile;
+use App\Rules\XProfileHandle;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
-use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -22,16 +22,12 @@ class RemoveProfile extends Tool
     public function handle(Request $request): Response
     {
         $validated = $request->validate([
-            'username' => ['required', 'string'],
+            'username' => ['required', 'string', new XProfileHandle],
         ], [
             'username.required' => 'Provide the username, @handle or profile URL to stop monitoring.',
         ]);
 
-        try {
-            $username = Profile::usernameFromInput($validated['username']);
-        } catch (InvalidArgumentException $exception) {
-            return Response::error($exception->getMessage());
-        }
+        $username = Profile::usernameFromInput($validated['username']);
 
         $profile = Profile::query()->where('username', $username)->first();
 

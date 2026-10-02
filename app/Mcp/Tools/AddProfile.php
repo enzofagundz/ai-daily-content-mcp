@@ -3,9 +3,9 @@
 namespace App\Mcp\Tools;
 
 use App\Models\Profile;
+use App\Rules\XProfileHandle;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
-use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -20,16 +20,12 @@ class AddProfile extends Tool
     public function handle(Request $request): Response
     {
         $validated = $request->validate([
-            'url' => ['required', 'string'],
+            'url' => ['required', 'string', new XProfileHandle],
         ], [
             'url.required' => 'Provide the profile URL (https://x.com/theo), @handle or username to monitor.',
         ]);
 
-        try {
-            $username = Profile::usernameFromInput($validated['url']);
-        } catch (InvalidArgumentException $exception) {
-            return Response::error($exception->getMessage());
-        }
+        $username = Profile::usernameFromInput($validated['url']);
 
         $profile = Profile::withTrashed()->firstOrNew(['username' => $username]);
         $profile->url = "https://x.com/{$username}";

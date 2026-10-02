@@ -3,6 +3,7 @@
 namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\AddProfile;
+use App\Mcp\Tools\FetchRecentPosts;
 use App\Mcp\Tools\ListProfiles;
 use App\Mcp\Tools\RemoveProfile;
 use Laravel\Mcp\Server;
@@ -26,6 +27,7 @@ class DailyContentServer extends Server
         AddProfile::class,
         ListProfiles::class,
         RemoveProfile::class,
+        FetchRecentPosts::class,
     ];
 
     /**
