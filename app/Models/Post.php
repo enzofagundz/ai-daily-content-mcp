@@ -55,6 +55,12 @@ class Post extends Model
     /** @use HasFactory<PostFactory> */
     use HasFactory;
 
+    public const CLASSIFICATION_PENDING = 'pending';
+
+    public const CLASSIFICATION_CLASSIFIED = 'classified';
+
+    public const CLASSIFICATION_FAILED = 'failed';
+
     /**
      * @return BelongsTo<Profile, $this>
      */

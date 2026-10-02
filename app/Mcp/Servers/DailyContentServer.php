@@ -3,6 +3,7 @@
 namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\AddProfile;
+use App\Mcp\Tools\ClassifyPost;
 use App\Mcp\Tools\FetchRecentPosts;
 use App\Mcp\Tools\GetNewPosts;
 use App\Mcp\Tools\ListProfiles;
@@ -16,7 +17,7 @@ use Laravel\Mcp\Server\Tool;
 
 #[Name('Daily Content')]
 #[Version('0.1.0')]
-#[Instructions('Monitors X profiles and fetches their recent posts, handing the agent only posts it has not seen yet.')]
+#[Instructions('Monitors X profiles, fetches and stores their recent posts, and classifies each post with Cloudflare Clef so the agent can review the ones worth adapting into LinkedIn content. The MCP only collects, classifies and serves posts; it never writes or publishes LinkedIn content.')]
 class DailyContentServer extends Server
 {
     /**
@@ -30,6 +31,7 @@ class DailyContentServer extends Server
         RemoveProfile::class,
         FetchRecentPosts::class,
         GetNewPosts::class,
+        ClassifyPost::class,
     ];
 
     /**

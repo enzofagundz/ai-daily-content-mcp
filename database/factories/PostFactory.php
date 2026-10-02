@@ -30,4 +30,27 @@ class PostFactory extends Factory
             'presented_at' => null,
         ];
     }
+
+    public function classified(): static
+    {
+        return $this->state(fn (): array => [
+            'classification_status' => Post::CLASSIFICATION_CLASSIFIED,
+            'classification_relevant' => true,
+            'classification_score' => 0.9,
+            'classification_category' => 'developer_tools',
+            'classification_content_value_score' => 3.0,
+            'classification_adaptability_score' => 3.0,
+            'classification_profile_fit' => true,
+            'classification_requires_missing_media' => false,
+            'classified_at' => now(),
+        ]);
+    }
+
+    public function failed(): static
+    {
+        return $this->state(fn (): array => [
+            'classification_status' => Post::CLASSIFICATION_FAILED,
+            'classification_error' => 'Cloudflare Workers AI returned HTTP 500.',
+        ]);
+    }
 }

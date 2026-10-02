@@ -67,6 +67,9 @@ return [
 
     'questions' => [
         'relevant' => 'Este post contém uma ideia ou informação que vale a pena considerar para possível adaptação em conteúdo para o LinkedIn?',
+        'category' => 'Qual é a categoria principal deste post?',
+        'content_value' => 'Qual é o valor editorial deste post para possível adaptação em conteúdo?',
+        'linkedin_adaptability' => 'Quão adaptável este conteúdo é para um post no LinkedIn?',
         'fits_profile' => 'Este conteúdo está alinhado com os temas e posicionamento profissional definidos nas instruções editoriais?',
         'requires_missing_media' => 'O valor principal deste post depende de uma imagem, vídeo ou outro conteúdo visual que não está disponível para análise?',
     ],
