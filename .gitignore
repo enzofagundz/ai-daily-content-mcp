@@ -7,6 +7,8 @@
 /storage/*.key
 /storage/pail
 /vendor
+/scraper/.venv
+__pycache__/
 .env
 .env.backup
 .env.production

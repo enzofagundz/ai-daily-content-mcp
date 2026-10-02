@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Services\Twitter\PostSource;
+use App\Services\Twitter\TwscrapePostSource;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +17,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(PostSource::class, fn (): TwscrapePostSource => new TwscrapePostSource(
+            python: (string) config('services.scraper.python'),
+            script: (string) config('services.scraper.script'),
+            accountsDb: (string) config('services.scraper.accounts_db'),
+            timeout: (int) config('services.scraper.timeout'),
+        ));
     }
 
     /**
