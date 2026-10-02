@@ -18,15 +18,48 @@ use Illuminate\Support\Carbon;
  * @property string $author
  * @property Carbon $published_at
  * @property Carbon|null $presented_at
+ * @property string $classification_status
+ * @property bool|null $classification_relevant
+ * @property float|null $classification_score
+ * @property string|null $classification_category
+ * @property float|null $classification_content_value_score
+ * @property float|null $classification_adaptability_score
+ * @property bool|null $classification_profile_fit
+ * @property bool|null $classification_requires_missing_media
+ * @property Carbon|null $classified_at
+ * @property string|null $classification_error
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Profile $profile
  */
-#[Fillable(['profile_id', 'external_id', 'url', 'text', 'author', 'published_at'])]
+#[Fillable([
+    'profile_id',
+    'external_id',
+    'url',
+    'text',
+    'author',
+    'published_at',
+    'classification_status',
+    'classification_relevant',
+    'classification_score',
+    'classification_category',
+    'classification_content_value_score',
+    'classification_adaptability_score',
+    'classification_profile_fit',
+    'classification_requires_missing_media',
+    'classified_at',
+    'classification_error',
+])]
 class Post extends Model
 {
     /** @use HasFactory<PostFactory> */
     use HasFactory;
+
+    public const CLASSIFICATION_PENDING = 'pending';
+
+    public const CLASSIFICATION_CLASSIFIED = 'classified';
+
+    public const CLASSIFICATION_FAILED = 'failed';
 
     /**
      * @return BelongsTo<Profile, $this>
@@ -46,6 +79,13 @@ class Post extends Model
         return [
             'published_at' => 'datetime',
             'presented_at' => 'datetime',
+            'classification_relevant' => 'boolean',
+            'classification_score' => 'float',
+            'classification_content_value_score' => 'float',
+            'classification_adaptability_score' => 'float',
+            'classification_profile_fit' => 'boolean',
+            'classification_requires_missing_media' => 'boolean',
+            'classified_at' => 'datetime',
         ];
     }
 }

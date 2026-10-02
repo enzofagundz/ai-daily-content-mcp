@@ -4,6 +4,8 @@ namespace App\Mcp\Tools;
 
 use App\Models\Post;
 use App\Models\Profile;
+use App\Services\Classification\ClassificationException;
+use App\Services\Classification\PostClassifier;
 use App\Services\Twitter\FetchedPost;
 use App\Services\Twitter\PostSource;
 use App\Services\Twitter\PostSourceTarget;
@@ -30,6 +32,7 @@ class GetNewPosts extends Tool
 
     public function __construct(
         private PostSource $source,
+        private PostClassifier $classifier,
     ) {}
 
     /**
@@ -48,7 +51,11 @@ class GetNewPosts extends Tool
 
         if ($profiles->isEmpty()) {
             return Response::make(Response::text('No profiles are being monitored. Add one with add_profile.'))
-                ->withStructuredContent(['posts' => [], 'errors' => []]);
+                ->withStructuredContent([
+                    'posts' => [],
+                    'errors' => [],
+                    'classification' => ['classified' => 0, 'failed' => 0, 'errors' => []],
+                ]);
         }
 
         $targets = [];
@@ -67,11 +74,11 @@ class GetNewPosts extends Tool
             return Response::error("Fetch failed for every monitored profile. {$messages}");
         }
 
-        $posts = DB::transaction(function () use ($profiles, $result, $validated): array {
-            $this->persist($profiles, $result->posts);
+        $created = DB::transaction(fn (): array => $this->persist($profiles, $result->posts));
 
-            return $this->present((int) ($validated['limit'] ?? 20));
-        });
+        $posts = $this->present((int) ($validated['limit'] ?? 20));
+
+        $classification = $this->classify($created);
 
         $errors = collect($result->errors)
             ->map(fn (string $message, string $username): array => [
@@ -81,7 +88,11 @@ class GetNewPosts extends Tool
             ->values()
             ->all();
 
-        return Response::structured(['posts' => $posts, 'errors' => $errors]);
+        return Response::structured([
+            'posts' => $posts,
+            'errors' => $errors,
+            'classification' => $classification,
+        ]);
     }
 
     /**
@@ -109,10 +120,12 @@ class GetNewPosts extends Tool
     /**
      * @param  Collection<int, Profile>  $profiles
      * @param  list<FetchedPost>  $fetchedPosts
+     * @return list<Post>
      */
-    private function persist(Collection $profiles, array $fetchedPosts): void
+    private function persist(Collection $profiles, array $fetchedPosts): array
     {
         $byUsername = $profiles->keyBy('username');
+        $created = [];
 
         foreach ($fetchedPosts as $post) {
             $profile = $byUsername->get($post->username);
@@ -121,14 +134,52 @@ class GetNewPosts extends Tool
                 continue;
             }
 
-            Post::query()->firstOrCreate(['external_id' => $post->externalId], [
+            $stored = Post::query()->firstOrCreate(['external_id' => $post->externalId], [
                 'profile_id' => $profile->id,
                 'url' => $post->url,
                 'text' => $post->text,
                 'author' => $post->author,
                 'published_at' => $post->publishedAt,
             ]);
+
+            if ($stored->wasRecentlyCreated) {
+                $created[] = $stored;
+            }
         }
+
+        return $created;
+    }
+
+    /**
+     * Classify every newly collected post, isolating each failure.
+     *
+     * @param  list<Post>  $posts
+     * @return array{classified: int, failed: int, errors: list<array{post_id: int, message: string}>}
+     */
+    private function classify(array $posts): array
+    {
+        $classified = 0;
+        $failed = 0;
+        $errors = [];
+
+        foreach ($posts as $post) {
+            try {
+                $this->classifier->classify($post);
+                $classified++;
+            } catch (ClassificationException $exception) {
+                $failed++;
+                $errors[] = [
+                    'post_id' => $post->id,
+                    'message' => $exception->getMessage(),
+                ];
+            }
+        }
+
+        return [
+            'classified' => $classified,
+            'failed' => $failed,
+            'errors' => $errors,
+        ];
     }
 
     /**

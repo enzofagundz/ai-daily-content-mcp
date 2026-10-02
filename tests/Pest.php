@@ -1,10 +1,14 @@
 <?php
 
+use App\Services\Classification\ClassificationException;
+use App\Services\Classification\ContentClassification;
+use App\Services\Classification\ContentClassifier;
 use App\Services\Twitter\FetchedPost;
 use App\Services\Twitter\PostFetchResult;
 use App\Services\Twitter\PostSource;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\FakeContentClassifier;
 use Tests\Support\FakePostSource;
 use Tests\TestCase;
 
@@ -63,6 +67,38 @@ function fakeSource(PostFetchResult $result): FakePostSource
     app()->instance(PostSource::class, $fake);
 
     return $fake;
+}
+
+/**
+ * Bind a fake content classifier in the container and return it for assertions.
+ */
+function fakeClassifier(?ContentClassification $result = null, ?ClassificationException $exception = null, ?Closure $callback = null): FakeContentClassifier
+{
+    $fake = new FakeContentClassifier($result, $exception, $callback);
+    app()->instance(ContentClassifier::class, $fake);
+
+    return $fake;
+}
+
+/**
+ * Build classification signals above the default relevance thresholds.
+ */
+function classificationSignals(
+    float $relevanceProbability = 0.9,
+    string $category = 'developer_tools',
+    float $contentValueScore = 3.0,
+    float $adaptabilityScore = 3.0,
+    float $profileFitProbability = 0.9,
+    float $missingMediaProbability = 0.1,
+): ContentClassification {
+    return new ContentClassification(
+        relevanceProbability: $relevanceProbability,
+        category: $category,
+        contentValueScore: $contentValueScore,
+        adaptabilityScore: $adaptabilityScore,
+        profileFitProbability: $profileFitProbability,
+        missingMediaProbability: $missingMediaProbability,
+    );
 }
 
 /**
