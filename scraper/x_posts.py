@@ -12,7 +12,9 @@ Writes a JSON response to stdout:
 
 `since` is an exclusive stop condition: scanning a profile ends at the first
 post published at or before it. Replies and retweets are returned flagged so
-the caller can filter them.
+the caller can filter them. Tweets authored by other accounts (quoted tweets
+flattened into the timeline by twscrape) are skipped, and the scan stops once
+`limit` posts are collected for the profile.
 """
 
 import asyncio
@@ -68,6 +70,12 @@ async def fetch_target(api, target, limit):
     posts = []
 
     async for tweet in api.user_tweets(user.id, limit=limit):
+        if len(posts) >= limit:
+            break
+
+        if tweet.user.username.lower() != username.lower():
+            continue
+
         published = tweet.date if tweet.date.tzinfo else tweet.date.replace(tzinfo=timezone.utc)
 
         if since is not None and published <= since:

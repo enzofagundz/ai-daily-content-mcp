@@ -67,6 +67,69 @@ test('fetch maps posts and drops replies and retweets', function () {
         ->and($first->publishedAt->toIso8601String())->toBe('2026-10-02T10:00:00+00:00');
 });
 
+test('fetch caps posts per profile at the limit', function () {
+    Process::fake(['*' => Process::result(output: json_encode([
+        'posts' => [
+            ['external_id' => '111', 'url' => 'https://x.com/theo/status/111', 'text' => 'first', 'published_at' => '2026-10-02T10:00:00+00:00', 'author' => 'Theo', 'username' => 'theo', 'is_reply' => false, 'is_retweet' => false],
+            ['external_id' => '222', 'url' => 'https://x.com/theo/status/222', 'text' => 'second', 'published_at' => '2026-10-02T09:00:00+00:00', 'author' => 'Theo', 'username' => 'theo', 'is_reply' => false, 'is_retweet' => false],
+            ['external_id' => '333', 'url' => 'https://x.com/theo/status/333', 'text' => 'third', 'published_at' => '2026-10-02T08:00:00+00:00', 'author' => 'Theo', 'username' => 'theo', 'is_reply' => false, 'is_retweet' => false],
+        ],
+        'errors' => [],
+    ]))]);
+
+    $result = $this->source->fetch([new PostSourceTarget('theo')], 2);
+
+    expect(array_map(fn (FetchedPost $post): string => $post->externalId, $result->posts))
+        ->toBe(['111', '222']);
+});
+
+test('fetch caps each profile independently', function () {
+    Process::fake(['*' => Process::result(output: json_encode([
+        'posts' => [
+            ['external_id' => '111', 'url' => 'https://x.com/theo/status/111', 'text' => 'theo first', 'published_at' => '2026-10-02T10:00:00+00:00', 'author' => 'Theo', 'username' => 'theo', 'is_reply' => false, 'is_retweet' => false],
+            ['external_id' => '222', 'url' => 'https://x.com/theo/status/222', 'text' => 'theo second', 'published_at' => '2026-10-02T09:00:00+00:00', 'author' => 'Theo', 'username' => 'theo', 'is_reply' => false, 'is_retweet' => false],
+            ['external_id' => '333', 'url' => 'https://x.com/simonw/status/333', 'text' => 'simonw first', 'published_at' => '2026-10-02T08:00:00+00:00', 'author' => 'Simon', 'username' => 'simonw', 'is_reply' => false, 'is_retweet' => false],
+            ['external_id' => '444', 'url' => 'https://x.com/simonw/status/444', 'text' => 'simonw second', 'published_at' => '2026-10-02T07:00:00+00:00', 'author' => 'Simon', 'username' => 'simonw', 'is_reply' => false, 'is_retweet' => false],
+        ],
+        'errors' => [],
+    ]))]);
+
+    $result = $this->source->fetch([new PostSourceTarget('theo'), new PostSourceTarget('simonw')], 1);
+
+    expect(array_map(fn (FetchedPost $post): string => $post->externalId, $result->posts))
+        ->toBe(['111', '333']);
+});
+
+test('fetch drops posts authored by accounts outside the targets', function () {
+    Process::fake(['*' => Process::result(output: json_encode([
+        'posts' => [
+            ['external_id' => '111', 'url' => 'https://x.com/theo/status/111', 'text' => 'hello', 'published_at' => '2026-10-02T10:00:00+00:00', 'author' => 'Theo', 'username' => 'theo', 'is_reply' => false, 'is_retweet' => false],
+            ['external_id' => '222', 'url' => 'https://x.com/claudeai/status/222', 'text' => 'a quoted thread', 'published_at' => '2026-10-02T09:00:00+00:00', 'author' => 'Claude', 'username' => 'claudeai', 'is_reply' => false, 'is_retweet' => false],
+            ['external_id' => '333', 'url' => 'https://x.com/theo/status/333', 'text' => 'more from theo', 'published_at' => '2026-10-02T08:00:00+00:00', 'author' => 'Theo', 'username' => 'theo', 'is_reply' => false, 'is_retweet' => false],
+        ],
+        'errors' => [],
+    ]))]);
+
+    $result = $this->source->fetch([new PostSourceTarget('theo')], 60);
+
+    expect(array_map(fn (FetchedPost $post): string => $post->externalId, $result->posts))
+        ->toBe(['111', '333']);
+});
+
+test('fetch matches target handles case-insensitively', function () {
+    Process::fake(['*' => Process::result(output: json_encode([
+        'posts' => [
+            ['external_id' => '111', 'url' => 'https://x.com/Theo/status/111', 'text' => 'hello', 'published_at' => '2026-10-02T10:00:00+00:00', 'author' => 'Theo', 'username' => 'Theo', 'is_reply' => false, 'is_retweet' => false],
+        ],
+        'errors' => [],
+    ]))]);
+
+    $result = $this->source->fetch([new PostSourceTarget('theo')], 60);
+
+    expect(array_map(fn (FetchedPost $post): string => $post->externalId, $result->posts))
+        ->toBe(['111']);
+});
+
 test('fetch reports per-profile errors from the scraper', function () {
     Process::fake(['*' => Process::result(output: json_encode([
         'posts' => [],

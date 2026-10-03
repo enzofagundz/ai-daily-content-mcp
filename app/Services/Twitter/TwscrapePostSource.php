@@ -49,7 +49,10 @@ final class TwscrapePostSource implements PostSource
             return PostFetchResult::failed($targets, $this->failureMessage($process));
         }
 
-        $posts = $this->mapPosts($decoded['posts'] ?? []);
+        $posts = $this->capPostsPerProfile(
+            $this->dropPostsOutsideTargets($this->mapPosts($decoded['posts'] ?? []), $targets),
+            $limit,
+        );
         $errors = $this->mapErrors($decoded['errors'] ?? [], $targets);
 
         if (! $process->successful() && $posts === [] && $errors === []) {
@@ -57,6 +60,49 @@ final class TwscrapePostSource implements PostSource
         }
 
         return new PostFetchResult($posts, $errors);
+    }
+
+    /**
+     * Drop posts authored by accounts other than the requested targets.
+     *
+     * @param  list<FetchedPost>  $posts
+     * @param  list<PostSourceTarget>  $targets
+     * @return list<FetchedPost>
+     */
+    private function dropPostsOutsideTargets(array $posts, array $targets): array
+    {
+        $usernames = array_map(fn (PostSourceTarget $target): string => Str::lower($target->username), $targets);
+
+        return array_values(array_filter(
+            $posts,
+            fn (FetchedPost $post): bool => in_array(Str::lower($post->username), $usernames, true),
+        ));
+    }
+
+    /**
+     * Cap the number of posts kept for each profile at the requested limit.
+     *
+     * @param  list<FetchedPost>  $posts
+     * @return list<FetchedPost>
+     */
+    private function capPostsPerProfile(array $posts, int $limit): array
+    {
+        $counts = [];
+        $kept = [];
+
+        foreach ($posts as $post) {
+            $username = Str::lower($post->username);
+
+            $counts[$username] = ($counts[$username] ?? 0) + 1;
+
+            if ($counts[$username] > $limit) {
+                continue;
+            }
+
+            $kept[] = $post;
+        }
+
+        return $kept;
     }
 
     /**
