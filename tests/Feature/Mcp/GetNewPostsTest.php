@@ -272,6 +272,118 @@ test('get_new_posts keeps posts pending when the call fails', function () {
     $this->assertDatabaseHas('posts', ['external_id' => '1', 'presented_at' => null]);
 });
 
+test('get_new_posts presents posts published after the last successful presentation', function () {
+    travelTo('2026-10-04 12:00:00');
+
+    $profile = Profile::factory()->create(['username' => 'theo']);
+
+    Post::factory()->create([
+        'profile_id' => $profile->id,
+        'external_id' => 'presented',
+        'published_at' => '2026-09-30T12:00:00Z',
+        'presented_at' => '2026-10-01T12:00:00Z',
+    ]);
+
+    fakeSource(new PostFetchResult([
+        fetchedPost('1', 'theo', '2026-10-02T06:00:00Z'),
+    ], []));
+
+    fakeClassifier();
+
+    DailyContentServer::tool(GetNewPosts::class, [])
+        ->assertOk()
+        ->assertStructuredContent(function (AssertableJson $json) {
+            $json->has('posts', 1)
+                ->where('posts.0.url', 'https://x.com/theo/status/1')
+                ->where('errors', [])
+                ->where('classification.classified', 1)
+                ->where('classification.failed', 0)
+                ->where('classification.errors', []);
+        });
+});
+
+test('get_new_posts caps the catch-up at the max lookback', function () {
+    travelTo('2026-10-04 12:00:00');
+
+    $profile = Profile::factory()->create(['username' => 'theo']);
+
+    Post::factory()->create([
+        'profile_id' => $profile->id,
+        'external_id' => 'presented',
+        'published_at' => '2026-07-30T12:00:00Z',
+        'presented_at' => '2026-08-01T12:00:00Z',
+    ]);
+
+    fakeSource(new PostFetchResult([
+        fetchedPost('old', 'theo', '2026-09-20T12:00:00Z'),
+        fetchedPost('recent', 'theo', '2026-09-28T12:00:00Z'),
+    ], []));
+
+    fakeClassifier();
+
+    DailyContentServer::tool(GetNewPosts::class, [])
+        ->assertOk()
+        ->assertStructuredContent(function (AssertableJson $json) {
+            $json->has('posts', 1)
+                ->where('posts.0.url', 'https://x.com/theo/status/recent')
+                ->where('errors', [])
+                ->where('classification.classified', 2)
+                ->where('classification.failed', 0)
+                ->where('classification.errors', []);
+        });
+
+    $this->assertDatabaseHas('posts', ['external_id' => 'old', 'presented_at' => null]);
+});
+
+test('a failed run does not move the watermark, so the next run catches up', function () {
+    travelTo('2026-10-01 12:00:00');
+
+    Profile::factory()->create(['username' => 'theo']);
+
+    fakeSource(new PostFetchResult([
+        fetchedPost('first', 'theo', '2026-10-01T10:00:00Z'),
+    ], []));
+
+    fakeClassifier();
+
+    DailyContentServer::tool(GetNewPosts::class, [])->assertOk();
+
+    travelTo('2026-10-03 12:00:00');
+
+    fakeSource(new PostFetchResult([
+        fetchedPost('missed', 'theo', '2026-10-02T10:00:00Z'),
+    ], []));
+
+    fakeClassifier(callback: function (): never {
+        throw new RuntimeException('classifier exploded');
+    });
+
+    try {
+        DailyContentServer::tool(GetNewPosts::class, [])->assertOk();
+    } catch (Throwable) {
+        // The run fails after selecting the post; it must stay pending.
+    }
+
+    $this->assertDatabaseHas('posts', ['external_id' => 'missed', 'presented_at' => null]);
+
+    travelTo('2026-10-04 12:00:00');
+
+    fakeSource(new PostFetchResult([], []));
+
+    fakeClassifier();
+
+    DailyContentServer::tool(GetNewPosts::class, [])
+        ->assertOk()
+        ->assertStructuredContent(function (AssertableJson $json) {
+            $json->has('posts', 1)
+                ->where('posts.0.url', 'https://x.com/theo/status/missed')
+                ->where('errors', [])
+                ->where('classification.classified', 0)
+                ->where('classification.failed', 0)
+                ->where('classification.errors', []);
+        });
+});
+
 test('get_new_posts sends the newest known post per profile as since and caps the scrape', function () {
     $theo = Profile::factory()->create(['username' => 'theo']);
     Profile::factory()->create(['username' => 'simonw']);

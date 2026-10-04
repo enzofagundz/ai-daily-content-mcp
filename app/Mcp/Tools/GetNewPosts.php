@@ -190,20 +190,32 @@ class GetNewPosts extends Tool
     }
 
     /**
-     * Select the newest pending posts published within the recency window.
+     * Select the newest pending posts published within the recency floor.
      *
-     * Nothing is marked here: the posts are only marked as presented once the
-     * response payload has been built, so a failed call never consumes them.
+     * The floor is the recency window, extended back to the last successful
+     * presentation (capped by the max lookback) so a missed run does not drop
+     * posts. Nothing is marked here: posts are only marked as presented once
+     * the response payload has been built, so a failed call never consumes them.
      *
      * @return Collection<int, Post>
      */
     private function pendingPosts(int $limit): Collection
     {
+        $floor = now()->subHours((int) config('content.window_hours'));
+
+        $lastPresentation = Post::query()->max('presented_at');
+
+        if ($lastPresentation !== null) {
+            $floor = $floor->min(CarbonImmutable::parse($lastPresentation));
+        }
+
+        $floor = $floor->max(now()->subHours((int) config('content.max_lookback_hours')));
+
         return Post::query()
             ->fromMonitoredProfile()
             ->with('profile')
             ->whereNull('presented_at')
-            ->where('published_at', '>=', now()->subHours((int) config('content.window_hours')))
+            ->where('published_at', '>=', $floor)
             ->orderByDesc('published_at')
             ->limit($limit)
             ->get();
