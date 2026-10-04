@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Support\ClassifiedPostPayload;
 use App\Models\Post;
 use App\Models\Profile;
 use App\Services\Classification\ClassificationException;
@@ -22,7 +23,7 @@ use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 
 #[IsOpenWorld]
-#[Description('Returns monitored posts that have never been presented before, newest first, and marks them as presented. Posts beyond the limit stay pending for later calls.')]
+#[Description('Returns monitored posts published within the recency window that have never been presented before, newest first, with their classification, and marks them as presented. Posts beyond the limit stay pending for later calls.')]
 class GetNewPosts extends Tool
 {
     /**
@@ -88,8 +89,12 @@ class GetNewPosts extends Tool
             ->values()
             ->all();
 
+        $payload = $posts
+            ->map(fn (Post $post): array => ClassifiedPostPayload::for($post->refresh()))
+            ->all();
+
         return Response::structured([
-            'posts' => $posts,
+            'posts' => $payload,
             'errors' => $errors,
             'classification' => $classification,
         ]);
@@ -183,36 +188,30 @@ class GetNewPosts extends Tool
     }
 
     /**
-     * @return list<array{author: string, username: string, text: string, url: string, published_at: string}>
+     * Select and mark the newest pending posts published within the recency window.
+     *
+     * The returned models are not refreshed; the caller refreshes each one after
+     * classification so the response carries the fresh signals.
+     *
+     * @return Collection<int, Post>
      */
-    private function present(int $limit): array
+    private function present(int $limit): Collection
     {
         $posts = Post::query()
             ->fromMonitoredProfile()
             ->with('profile')
             ->whereNull('presented_at')
+            ->where('published_at', '>=', now()->subHours((int) config('content.window_hours')))
             ->orderByDesc('published_at')
             ->limit($limit)
             ->get();
 
         if ($posts->isEmpty()) {
-            return [];
+            return $posts;
         }
 
         Post::query()->whereIn('id', $posts->pluck('id'))->update(['presented_at' => now()]);
 
-        $presented = [];
-
-        foreach ($posts as $post) {
-            $presented[] = [
-                'author' => $post->author,
-                'username' => $post->profile->username,
-                'text' => $post->text,
-                'url' => $post->url,
-                'published_at' => $post->published_at->toIso8601String(),
-            ];
-        }
-
-        return $presented;
+        return $posts;
     }
 }

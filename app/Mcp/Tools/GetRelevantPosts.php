@@ -14,7 +14,7 @@ use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[IsReadOnly]
-#[Description('Returns the posts classified as relevant candidates for LinkedIn content, newest first, with their classification signals. Read-only: never classifies or reclassifies a post.')]
+#[Description('Returns the standing list of posts classified as relevant candidates for LinkedIn content, newest first, with their classification signals. Manual lookup only: the daily digest is built from get_new_posts, which returns candidates already classified. Read-only: never classifies or reclassifies a post.')]
 class GetRelevantPosts extends Tool
 {
     /**

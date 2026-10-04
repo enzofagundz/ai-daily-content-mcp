@@ -19,7 +19,7 @@ use Laravel\Mcp\Server\Tool;
 
 #[Name('Daily Content')]
 #[Version('0.1.0')]
-#[Instructions('Monitors X profiles and classifies their posts with Cloudflare Clef for LinkedIn content triage. Use get_new_posts to collect and classify new posts, get_relevant_posts to review the relevant candidates, and classify_pending_posts to catch up on posts collected before the classifier existed. The MCP only collects, classifies and serves posts; it never writes or publishes LinkedIn content.')]
+#[Instructions('Monitors X profiles and classifies their posts with Cloudflare Clef for LinkedIn content triage. Build the daily digest from a single get_new_posts call: it collects, classifies and returns recent posts with their classification, and candidates are the returned posts with classification.relevant true. Posts published before the recency window are never presented as new. Use get_relevant_posts only as a manual lookup over the standing list of relevant posts, and classify_pending_posts to catch up on posts whose classification is still pending. The MCP only collects, classifies and serves posts; it never writes or publishes LinkedIn content.')]
 class DailyContentServer extends Server
 {
     /**

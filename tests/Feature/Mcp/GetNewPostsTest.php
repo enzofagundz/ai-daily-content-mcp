@@ -12,7 +12,11 @@ use App\Services\Twitter\PostFetchResult;
 use Carbon\CarbonImmutable;
 use Illuminate\Testing\Fluent\AssertableJson;
 
+use function Pest\Laravel\travelTo;
+
 test('get_new_posts persists fetched posts and returns them newest first, marked as presented', function () {
+    travelTo('2026-10-03 07:00:00');
+
     Profile::factory()->create(['username' => 'theo']);
 
     fakeSource(new PostFetchResult([
@@ -45,6 +49,8 @@ test('get_new_posts persists fetched posts and returns them newest first, marked
 });
 
 test('get_new_posts does not return a post twice', function () {
+    travelTo('2026-10-02 12:00:00');
+
     Profile::factory()->create(['username' => 'theo']);
 
     fakeSource(new PostFetchResult([
@@ -74,6 +80,8 @@ test('get_new_posts does not return a post twice', function () {
 });
 
 test('get_new_posts keeps the excess pending and returns it on later calls', function () {
+    travelTo('2026-10-02 12:00:00');
+
     Profile::factory()->create(['username' => 'theo']);
 
     $posts = [];
@@ -123,6 +131,125 @@ test('get_new_posts keeps the excess pending and returns it on later calls', fun
         ]);
 });
 
+test('get_new_posts does not present posts older than the recency window', function () {
+    travelTo('2026-10-04 12:00:00');
+
+    Profile::factory()->create(['username' => 'theo']);
+
+    fakeSource(new PostFetchResult([
+        fetchedPost('1', 'theo', '2026-09-20T08:00:00Z'),
+    ], []));
+
+    fakeClassifier();
+
+    DailyContentServer::tool(GetNewPosts::class, [])
+        ->assertOk()
+        ->assertStructuredContent([
+            'posts' => [],
+            'errors' => [],
+            'classification' => ['classified' => 1, 'failed' => 0, 'errors' => []],
+        ]);
+
+    $this->assertDatabaseHas('posts', ['external_id' => '1', 'presented_at' => null]);
+});
+
+test('get_new_posts uses the configured recency window', function () {
+    travelTo('2026-10-04 12:00:00');
+    config(['content.window_hours' => 1]);
+
+    Profile::factory()->create(['username' => 'theo']);
+
+    fakeSource(new PostFetchResult([
+        fetchedPost('1', 'theo', '2026-10-04T11:30:00Z'),
+        fetchedPost('2', 'theo', '2026-10-04T09:00:00Z'),
+    ], []));
+
+    fakeClassifier();
+
+    DailyContentServer::tool(GetNewPosts::class, [])
+        ->assertOk()
+        ->assertStructuredContent(function (AssertableJson $json) {
+            $json->has('posts', 1)
+                ->where('posts.0.url', 'https://x.com/theo/status/1')
+                ->where('errors', [])
+                ->where('classification.classified', 2)
+                ->where('classification.failed', 0)
+                ->where('classification.errors', []);
+        });
+
+    $this->assertDatabaseHas('posts', ['external_id' => '2', 'presented_at' => null]);
+    $this->assertDatabaseMissing('posts', ['external_id' => '1', 'presented_at' => null]);
+});
+
+test('get_new_posts returns the classification of each presented post', function () {
+    travelTo('2026-10-04 12:00:00');
+
+    Profile::factory()->create(['username' => 'theo']);
+
+    fakeSource(new PostFetchResult([
+        fetchedPost('1', 'theo', '2026-10-04T11:00:00Z'),
+    ], []));
+
+    fakeClassifier(classificationSignals(contentValueScore: 2.5, adaptabilityScore: 2.5));
+
+    DailyContentServer::tool(GetNewPosts::class, [])
+        ->assertOk()
+        ->assertStructuredContent(function (AssertableJson $json) {
+            $json->has('posts', 1)
+                ->where('posts.0.classification.status', 'classified')
+                ->where('posts.0.classification.relevant', true)
+                ->where('posts.0.classification.score', 0.9)
+                ->where('posts.0.classification.category', 'developer_tools')
+                ->where('posts.0.classification.content_value_score', 2.5)
+                ->where('posts.0.classification.adaptability_score', 2.5)
+                ->where('posts.0.classification.fits_profile', true)
+                ->where('posts.0.classification.requires_missing_media', false)
+                ->where('posts.0.classification.classified_at', '2026-10-04T12:00:00+00:00')
+                ->where('errors', [])
+                ->where('classification.classified', 1)
+                ->where('classification.failed', 0)
+                ->where('classification.errors', []);
+        });
+});
+
+test('get_new_posts returns the classification of a post presented on a later call', function () {
+    travelTo('2026-10-04 12:00:00');
+
+    Profile::factory()->create(['username' => 'theo']);
+
+    fakeSource(new PostFetchResult([
+        fetchedPost('1', 'theo', '2026-10-04T10:00:00Z'),
+        fetchedPost('2', 'theo', '2026-10-04T11:00:00Z'),
+    ], []));
+
+    fakeClassifier();
+
+    DailyContentServer::tool(GetNewPosts::class, ['limit' => 1])
+        ->assertOk()
+        ->assertStructuredContent(function (AssertableJson $json) {
+            $json->has('posts', 1)
+                ->where('posts.0.url', 'https://x.com/theo/status/2')
+                ->where('posts.0.classification.status', 'classified')
+                ->where('errors', [])
+                ->where('classification.classified', 2)
+                ->where('classification.failed', 0)
+                ->where('classification.errors', []);
+        });
+
+    DailyContentServer::tool(GetNewPosts::class, ['limit' => 1])
+        ->assertOk()
+        ->assertStructuredContent(function (AssertableJson $json) {
+            $json->has('posts', 1)
+                ->where('posts.0.url', 'https://x.com/theo/status/1')
+                ->where('posts.0.classification.status', 'classified')
+                ->where('posts.0.classification.relevant', true)
+                ->where('errors', [])
+                ->where('classification.classified', 0)
+                ->where('classification.failed', 0)
+                ->where('classification.errors', []);
+        });
+});
+
 test('get_new_posts sends the newest known post per profile as since and caps the scrape', function () {
     $theo = Profile::factory()->create(['username' => 'theo']);
     Profile::factory()->create(['username' => 'simonw']);
@@ -159,6 +286,8 @@ test('get_new_posts rejects an invalid limit', function (int $limit) {
 })->with([0, 101]);
 
 test('get_new_posts reports partial profile failures without failing the call', function () {
+    travelTo('2026-10-02 12:00:00');
+
     Profile::factory()->create(['username' => 'theo']);
     Profile::factory()->create(['username' => 'simonw']);
 
@@ -206,12 +335,15 @@ test('get_new_posts preserves the posts of removed profiles', function () {
 });
 
 test('get_new_posts classifies only the newly collected posts', function () {
+    travelTo('2026-10-03 07:00:00');
+
     $profile = Profile::factory()->create(['username' => 'theo']);
 
     Post::factory()->create([
         'profile_id' => $profile->id,
         'external_id' => '1',
         'text' => 'old post',
+        'published_at' => '2026-10-01T08:00:00Z',
     ]);
 
     fakeSource(new PostFetchResult([
@@ -239,6 +371,8 @@ test('get_new_posts classifies only the newly collected posts', function () {
 });
 
 test('get_new_posts classifies posts beyond the presentation limit', function () {
+    travelTo('2026-10-02 12:00:00');
+
     Profile::factory()->create(['username' => 'theo']);
 
     $posts = [];
@@ -270,6 +404,8 @@ test('get_new_posts classifies posts beyond the presentation limit', function ()
 });
 
 test('a classification failure does not fail the collection', function () {
+    travelTo('2026-10-03 07:00:00');
+
     Profile::factory()->create(['username' => 'theo']);
 
     fakeSource(new PostFetchResult([
@@ -289,6 +425,10 @@ test('a classification failure does not fail the collection', function () {
         ->assertOk()
         ->assertStructuredContent(function (AssertableJson $json) {
             $json->has('posts', 2)
+                ->where('posts.0.classification.status', 'classified')
+                ->where('posts.0.classification.relevant', true)
+                ->where('posts.1.classification.status', 'failed')
+                ->where('posts.1.classification.relevant', null)
                 ->where('errors', [])
                 ->where('classification.classified', 1)
                 ->where('classification.failed', 1)
