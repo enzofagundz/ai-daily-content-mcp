@@ -77,7 +77,7 @@ class GetNewPosts extends Tool
 
         $created = DB::transaction(fn (): array => $this->persist($profiles, $result->posts));
 
-        $posts = $this->present((int) ($validated['limit'] ?? 20));
+        $posts = $this->pendingPosts((int) ($validated['limit'] ?? 20));
 
         $classification = $this->classify($created);
 
@@ -92,6 +92,8 @@ class GetNewPosts extends Tool
         $payload = $posts
             ->map(fn (Post $post): array => ClassifiedPostPayload::for($post->refresh()))
             ->all();
+
+        $this->markPresented($posts);
 
         return Response::structured([
             'posts' => $payload,
@@ -188,16 +190,16 @@ class GetNewPosts extends Tool
     }
 
     /**
-     * Select and mark the newest pending posts published within the recency window.
+     * Select the newest pending posts published within the recency window.
      *
-     * The returned models are not refreshed; the caller refreshes each one after
-     * classification so the response carries the fresh signals.
+     * Nothing is marked here: the posts are only marked as presented once the
+     * response payload has been built, so a failed call never consumes them.
      *
      * @return Collection<int, Post>
      */
-    private function present(int $limit): Collection
+    private function pendingPosts(int $limit): Collection
     {
-        $posts = Post::query()
+        return Post::query()
             ->fromMonitoredProfile()
             ->with('profile')
             ->whereNull('presented_at')
@@ -205,13 +207,17 @@ class GetNewPosts extends Tool
             ->orderByDesc('published_at')
             ->limit($limit)
             ->get();
+    }
 
+    /**
+     * @param  Collection<int, Post>  $posts
+     */
+    private function markPresented(Collection $posts): void
+    {
         if ($posts->isEmpty()) {
-            return $posts;
+            return;
         }
 
         Post::query()->whereIn('id', $posts->pluck('id'))->update(['presented_at' => now()]);
-
-        return $posts;
     }
 }

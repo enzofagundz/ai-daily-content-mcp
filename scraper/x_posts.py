@@ -30,6 +30,31 @@ NO_ACCOUNT_MESSAGE = (
     "after logging in with the twitter-mcp do_login script."
 )
 
+UNAVAILABLE_MESSAGE = (
+    "X account temporarily unavailable (request limit reached). "
+    "Try again after {when}."
+)
+
+LOCKED_QUEUES = ("UserTweets", "UserByScreenName")
+
+
+async def unavailable_message(api):
+    """Explain a NoAccountError: nothing configured vs. every account locked."""
+    accounts = await api.pool.accounts_info()
+
+    if not accounts:
+        return NO_ACCOUNT_MESSAGE
+
+    waits = []
+
+    for queue in LOCKED_QUEUES:
+        when = await api.pool.next_available_at(queue)
+
+        if when and when != "now":
+            waits.append(when)
+
+    return UNAVAILABLE_MESSAGE.format(when=min(waits) if waits else "a few minutes")
+
 
 def parse_since(value):
     if not value:
@@ -100,7 +125,7 @@ async def run(payload):
             if error is not None:
                 errors.append(error)
         except NoAccountError:
-            errors.append({"username": target.get("username"), "message": NO_ACCOUNT_MESSAGE})
+            errors.append({"username": target.get("username"), "message": await unavailable_message(api)})
         except Exception as exc:  # reported per profile to the caller
             errors.append({"username": target.get("username"), "message": str(exc)})
 

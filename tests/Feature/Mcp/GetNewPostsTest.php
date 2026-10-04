@@ -250,6 +250,28 @@ test('get_new_posts returns the classification of a post presented on a later ca
         });
 });
 
+test('get_new_posts keeps posts pending when the call fails', function () {
+    travelTo('2026-10-04 12:00:00');
+
+    Profile::factory()->create(['username' => 'theo']);
+
+    fakeSource(new PostFetchResult([
+        fetchedPost('1', 'theo', '2026-10-04T11:00:00Z'),
+    ], []));
+
+    fakeClassifier(callback: function (): never {
+        throw new RuntimeException('classifier exploded');
+    });
+
+    try {
+        DailyContentServer::tool(GetNewPosts::class, [])->assertOk();
+    } catch (Throwable) {
+        // The call is expected to fail; the invariant under test is below.
+    }
+
+    $this->assertDatabaseHas('posts', ['external_id' => '1', 'presented_at' => null]);
+});
+
 test('get_new_posts sends the newest known post per profile as since and caps the scrape', function () {
     $theo = Profile::factory()->create(['username' => 'theo']);
     Profile::factory()->create(['username' => 'simonw']);
