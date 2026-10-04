@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Database\Factories\PostFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -67,6 +68,19 @@ class Post extends Model
     public function profile(): BelongsTo
     {
         return $this->belongsTo(Profile::class);
+    }
+
+    /**
+     * Restrict to posts whose monitored profile still exists.
+     *
+     * Posts outlive a soft-deleted profile, so without this filter the
+     * `profile` relation resolves to null and reading its username crashes.
+     *
+     * @param  Builder<Post>  $query
+     */
+    public function scopeFromMonitoredProfile(Builder $query): void
+    {
+        $query->whereHas('profile');
     }
 
     /**

@@ -3,6 +3,7 @@
 use App\Mcp\Servers\DailyContentServer;
 use App\Mcp\Tools\ClassifyPendingPosts;
 use App\Models\Post;
+use App\Models\Profile;
 use App\Services\Classification\ClassificationException;
 use App\Services\Classification\ContentClassification;
 use App\Services\Classification\PostClassificationInput;
@@ -117,6 +118,23 @@ test('classify_pending_posts isolates a per-post failure', function () {
         });
 
     expect($broken->refresh()->classification_status)->toBe('failed');
+});
+
+test('classify_pending_posts ignores pending posts from removed profiles', function () {
+    $removed = Profile::factory()->create(['username' => 'theo']);
+    Post::factory()->create(['profile_id' => $removed->id]);
+    $removed->delete();
+
+    fakeClassifier();
+
+    DailyContentServer::tool(ClassifyPendingPosts::class, [])
+        ->assertOk()
+        ->assertStructuredContent([
+            'classified' => 0,
+            'failed' => 0,
+            'remaining' => 0,
+            'errors' => [],
+        ]);
 });
 
 test('classify_pending_posts rejects an invalid limit', function (int $limit) {

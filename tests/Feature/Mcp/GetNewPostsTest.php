@@ -300,3 +300,21 @@ test('a classification failure does not fail the collection', function () {
     $this->assertDatabaseHas('posts', ['external_id' => '2', 'classification_status' => Post::CLASSIFICATION_CLASSIFIED]);
     $this->assertDatabaseMissing('posts', ['presented_at' => null]);
 });
+
+test('get_new_posts ignores pending posts from removed profiles', function () {
+    $removed = Profile::factory()->create(['username' => 'theo']);
+    Post::factory()->create(['profile_id' => $removed->id, 'presented_at' => null]);
+    $removed->delete();
+
+    Profile::factory()->create(['username' => 'simonw']);
+
+    fakeSource(new PostFetchResult([], []));
+
+    DailyContentServer::tool(GetNewPosts::class, [])
+        ->assertOk()
+        ->assertStructuredContent(function (AssertableJson $json) {
+            $json->has('posts', 0)
+                ->where('errors', [])
+                ->where('classification', ['classified' => 0, 'failed' => 0, 'errors' => []]);
+        });
+});

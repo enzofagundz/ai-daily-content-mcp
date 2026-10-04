@@ -48,6 +48,7 @@ class ClassifyPendingPosts extends Tool
             : [Post::CLASSIFICATION_PENDING];
 
         $posts = Post::query()
+            ->fromMonitoredProfile()
             ->with('profile')
             ->whereIn('classification_status', $statuses)
             ->orderByDesc('published_at')
@@ -74,7 +75,7 @@ class ClassifyPendingPosts extends Tool
         return Response::structured([
             'classified' => $classified,
             'failed' => $failed,
-            'remaining' => Post::query()->whereIn('classification_status', $statuses)->count(),
+            'remaining' => Post::query()->fromMonitoredProfile()->whereIn('classification_status', $statuses)->count(),
             'errors' => $errors,
         ]);
     }

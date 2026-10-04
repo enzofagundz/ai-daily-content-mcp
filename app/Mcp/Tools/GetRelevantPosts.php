@@ -35,6 +35,7 @@ class GetRelevantPosts extends Tool
         ]);
 
         $posts = Post::query()
+            ->fromMonitoredProfile()
             ->with('profile')
             ->where('classification_status', Post::CLASSIFICATION_CLASSIFIED)
             ->where('classification_relevant', true)

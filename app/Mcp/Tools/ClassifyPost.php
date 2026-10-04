@@ -37,7 +37,7 @@ class ClassifyPost extends Tool
 
         $postId = (int) $validated['post_id'];
 
-        $post = Post::query()->with('profile')->find($postId);
+        $post = Post::query()->fromMonitoredProfile()->with('profile')->find($postId);
 
         if ($post === null) {
             return Response::error("Post {$postId} was not found.");

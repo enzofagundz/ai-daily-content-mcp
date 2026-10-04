@@ -188,6 +188,7 @@ class GetNewPosts extends Tool
     private function present(int $limit): array
     {
         $posts = Post::query()
+            ->fromMonitoredProfile()
             ->with('profile')
             ->whereNull('presented_at')
             ->orderByDesc('published_at')

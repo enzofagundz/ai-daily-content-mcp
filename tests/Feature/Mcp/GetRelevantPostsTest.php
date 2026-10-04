@@ -3,6 +3,7 @@
 use App\Mcp\Servers\DailyContentServer;
 use App\Mcp\Tools\GetRelevantPosts;
 use App\Models\Post;
+use App\Models\Profile;
 use Illuminate\Testing\Fluent\AssertableJson;
 
 test('get_relevant_posts returns only relevant classified posts, newest first', function () {
@@ -64,6 +65,21 @@ test('get_relevant_posts never classifies or reclassifies posts', function () {
     DailyContentServer::tool(GetRelevantPosts::class, [])->assertOk();
 
     expect($fake->calls)->toBe([]);
+});
+
+test('get_relevant_posts ignores relevant posts from removed profiles', function () {
+    $removed = Profile::factory()->create(['username' => 'theo']);
+    Post::factory()->classified()->create(['profile_id' => $removed->id]);
+    $removed->delete();
+
+    $kept = Post::factory()->classified()->create();
+
+    DailyContentServer::tool(GetRelevantPosts::class, [])
+        ->assertOk()
+        ->assertStructuredContent(function (AssertableJson $json) use ($kept) {
+            $json->has('posts', 1)
+                ->where('posts.0.id', $kept->id);
+        });
 });
 
 test('get_relevant_posts rejects an invalid limit', function (int $limit) {
